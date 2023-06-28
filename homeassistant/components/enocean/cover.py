@@ -8,7 +8,7 @@ from typing import Any
 
 from enocean.protocol.constants import RORG
 from enocean.protocol.packet import RadioPacket
-from enocean.utils import combine_hex
+from enocean.utils import from_hex_string, to_hex_string
 import voluptuous as vol
 
 from homeassistant.components.cover import (
@@ -19,6 +19,7 @@ from homeassistant.components.cover import (
     CoverEntity,
     CoverEntityFeature,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_DEVICE_CLASS, CONF_ID, CONF_NAME
 from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
@@ -26,8 +27,20 @@ from homeassistant.helpers.dispatcher import dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
+from .config_flow import (
+    CONF_ENOCEAN_DEVICE_ID,
+    CONF_ENOCEAN_DEVICE_NAME,
+    CONF_ENOCEAN_DEVICES,
+    CONF_ENOCEAN_EEP,
+    CONF_ENOCEAN_MANUFACTURER,
+    CONF_ENOCEAN_MODEL,
+    CONF_ENOCEAN_SENDER_ID,
+)
 from .const import SIGNAL_SEND_MESSAGE
 from .device import EnOceanEntity
+from .supported_device_type import (
+    EnOceanSupportedDeviceType,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,13 +69,51 @@ def setup_platform(
     discovery_info: DiscoveryInfoType | None = None,
 ) -> None:
     """Set up the Cover platform for EnOcean."""
-    dev_id = config[CONF_ID]
-    sender_id = config[CONF_SENDER_ID]
-    dev_name = config[CONF_NAME]
-    device_class = config.get(CONF_DEVICE_CLASS)
-    if device_class is None:
-        device_class = CoverDeviceClass.BLIND
-    add_entities([EnOceanCover(sender_id, dev_id, dev_name, device_class)])
+    # dev_id = config[CONF_ID]
+    # sender_id = config[CONF_SENDER_ID]
+    # dev_name = config[CONF_NAME]
+    # device_class = config.get(CONF_DEVICE_CLASS)
+    # if device_class is None:
+    #     device_class = CoverDeviceClass.BLIND
+    # add_entities([EnOceanCover(sender_id, dev_id, dev_name, device_class)])
+
+    # register_platform_config_for_migration_to_config_entry(
+    #     EnOceanPlatformConfig(platform=Platform.BINARY_SENSOR.value, config=config)
+    # )
+
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Set up entry."""
+    devices = config_entry.options.get(CONF_ENOCEAN_DEVICES, [])
+
+    for device in devices:
+        if device[CONF_ENOCEAN_EEP] != "D2-05-00":
+            continue
+
+        device_id = from_hex_string(device[CONF_ENOCEAN_DEVICE_ID])
+        sender_id = 0
+        if device[CONF_ENOCEAN_SENDER_ID] != "":
+            sender_id = from_hex_string(device[CONF_ENOCEAN_SENDER_ID])
+
+        async_add_entities(
+            [
+                EnOceanCover(
+                    sender_id=sender_id,
+                    dev_id=device_id,
+                    dev_name=device[CONF_ENOCEAN_DEVICE_NAME],
+                    dev_type=EnOceanSupportedDeviceType(
+                        manufacturer=device[CONF_ENOCEAN_MANUFACTURER],
+                        model=device[CONF_ENOCEAN_MODEL],
+                        eep=device[CONF_ENOCEAN_EEP],
+                    ),
+                    name=None,
+                )
+            ]
+        )
 
 
 class EnOceanCoverCommand(Enum):
@@ -76,18 +127,17 @@ class EnOceanCoverCommand(Enum):
 class EnOceanCover(EnOceanEntity, CoverEntity):
     """Representation of an EnOcean Cover (EEP D2-05-00)."""
 
-    def __init__(self, sender_id, dev_id, dev_name, device_class):
+    def __init__(self, sender_id, dev_id, dev_name, dev_type, name):
         """Initialize the EnOcean Cover."""
-        super().__init__(dev_id, dev_name)
-        self._attr_device_class = device_class
+        super().__init__(dev_id=dev_id, dev_name=dev_name, dev_type=dev_type, name=name)
+        self._attr_device_class = CoverDeviceClass.BLIND
         self._position = None
         self._is_closed = None
         self._is_opening = False
         self._is_closing = False
         self._sender_id = sender_id
-        self._dev_name = dev_name
-        self._attr_name = dev_name
-        self._attr_unique_id = f"{combine_hex(dev_id)}-{device_class}"
+        # self._attr_unique_id = f"{combine_hex(dev_id)}-{device_class}"
+        self._attr_unique_id = f"{to_hex_string(dev_id).upper()}"
         self._state_changed_by_command = False
         self._stop_suspected = False
         self._watchdog_enabled = False

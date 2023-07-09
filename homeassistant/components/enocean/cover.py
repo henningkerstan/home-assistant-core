@@ -25,21 +25,18 @@ from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.dispatcher import dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 from .config_flow import (
     CONF_ENOCEAN_DEVICE_ID,
     CONF_ENOCEAN_DEVICE_NAME,
+    CONF_ENOCEAN_DEVICE_TYPE_ID,
     CONF_ENOCEAN_DEVICES,
-    CONF_ENOCEAN_EEP,
-    CONF_ENOCEAN_MANUFACTURER,
-    CONF_ENOCEAN_MODEL,
     CONF_ENOCEAN_SENDER_ID,
 )
 from .const import SIGNAL_SEND_MESSAGE
 from .device import EnOceanEntity
 from .supported_device_type import (
-    EnOceanSupportedDeviceType,
+    get_supported_enocean_device_types,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -62,26 +59,6 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 )
 
 
-def setup_platform(
-    hass: HomeAssistant,
-    config: ConfigType,
-    add_entities: AddEntitiesCallback,
-    discovery_info: DiscoveryInfoType | None = None,
-) -> None:
-    """Set up the Cover platform for EnOcean."""
-    # dev_id = config[CONF_ID]
-    # sender_id = config[CONF_SENDER_ID]
-    # dev_name = config[CONF_NAME]
-    # device_class = config.get(CONF_DEVICE_CLASS)
-    # if device_class is None:
-    #     device_class = CoverDeviceClass.BLIND
-    # add_entities([EnOceanCover(sender_id, dev_id, dev_name, device_class)])
-
-    # register_platform_config_for_migration_to_config_entry(
-    #     EnOceanPlatformConfig(platform=Platform.BINARY_SENSOR.value, config=config)
-    # )
-
-
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
@@ -91,7 +68,10 @@ async def async_setup_entry(
     devices = config_entry.options.get(CONF_ENOCEAN_DEVICES, [])
 
     for device in devices:
-        if device[CONF_ENOCEAN_EEP] != "D2-05-00":
+        device_type_id = device[CONF_ENOCEAN_DEVICE_TYPE_ID]
+        device_type = get_supported_enocean_device_types()[device_type_id]
+        eep = device_type.eep
+        if eep != "D2-05-00":
             continue
 
         device_id = from_hex_string(device[CONF_ENOCEAN_DEVICE_ID])
@@ -105,11 +85,7 @@ async def async_setup_entry(
                     sender_id=sender_id,
                     dev_id=device_id,
                     dev_name=device[CONF_ENOCEAN_DEVICE_NAME],
-                    dev_type=EnOceanSupportedDeviceType(
-                        manufacturer=device[CONF_ENOCEAN_MANUFACTURER],
-                        model=device[CONF_ENOCEAN_MODEL],
-                        eep=device[CONF_ENOCEAN_EEP],
-                    ),
+                    dev_type=device_type,
                     name=None,
                 )
             ]

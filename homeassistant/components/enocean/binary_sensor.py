@@ -7,6 +7,7 @@ import voluptuous as vol
 from homeassistant.components.binary_sensor import (
     DEVICE_CLASSES_SCHEMA,
     PLATFORM_SCHEMA,
+    BinarySensorDeviceClass,
     BinarySensorEntity,
 )
 from homeassistant.config_entries import ConfigEntry
@@ -108,7 +109,7 @@ class EnOceanBinarySensor(EnOceanEntity, BinarySensorEntity):
         self._attr_unique_id = f"{to_hex_string(dev_id).upper()}-{device_class}"
 
     @property
-    def device_class(self):
+    def device_class(self) -> BinarySensorDeviceClass | None:
         """Return the class of this sensor."""
         return self._device_class
 

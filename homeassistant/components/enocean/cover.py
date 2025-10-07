@@ -103,7 +103,7 @@ class EnOceanCoverCommand(Enum):
 class EnOceanCover(EnOceanEntity, CoverEntity):
     """Representation of an EnOcean Cover (EEP D2-05-00)."""
 
-    def __init__(self, sender_id, dev_id, dev_name, dev_type, name):
+    def __init__(self, sender_id, dev_id, dev_name, dev_type, name) -> None:
         """Initialize the EnOcean Cover."""
         super().__init__(dev_id=dev_id, dev_name=dev_name, dev_type=dev_type, name=name)
         self._attr_device_class = CoverDeviceClass.BLIND
@@ -146,7 +146,7 @@ class EnOceanCover(EnOceanEntity, CoverEntity):
         """Return if the cover is closed or not."""
         return self._is_closed
 
-    async def async_added_to_hass(self):
+    async def async_added_to_hass(self) -> None:
         """Query status after Home Assistant (re)start."""
         await super().async_added_to_hass()
         self.start_or_feed_watchdog()
